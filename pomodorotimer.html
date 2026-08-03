@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Таймер работы и отдыха</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#10131a;
+    --surface:#1a1f2b;
+    --surface-2:#212736;
+    --surface-3:#2a3145;
+    --border:#31384c;
+    --text:#f2efe6;
+    --text-dim:#9aa3b8;
+    --text-faint:#5f6779;
+    --work:#e8a33d;
+    --work-strong:#f2b558;
+    --work-dim:rgba(232,163,61,0.14);
+    --rest:#4fb3ae;
+    --rest-strong:#63c4bf;
+    --rest-dim:rgba(79,179,174,0.14);
+    --danger:#d96c6c;
+    --good:#5fbe72;
+    --warn:#f0c43d;
+    --bad:#e5645c;
+    --done-fill:rgba(154,163,184,0.22);
+    --radius-lg:18px;
+    --radius-md:12px;
+    --radius-sm:8px;
+    --motion:280ms;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    :root{ --motion:0ms; }
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{ margin:0; padding:0; }
+
+  body{
+    background:radial-gradient(120% 140% at 15% -10%, #171d2b 0%, var(--ink) 55%);
+    color:var(--text);
+    font-family:'Manrope', system-ui, -apple-system, sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding:48px 20px 72px;
+  }
+
+  button{ font-family:inherit; }
+
+  :focus-visible{
+    outline:2px solid var(--work-strong);
+    outline-offset:2px;
+  }
+
+  .shell{ width:100%; max-width:560px; }
+
+  [hidden]{ display:none !important; }
+
+  /* ---------- Setup screen ---------- */
+
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+    font-weight:700;
+    margin:0 0 8px;
+  }
+
+  .setup h1{
+    font-size:clamp(24px,4vw,30px);
+    font-weight:800;
+    margin:0 0 6px;
+    letter-spacing:-0.01em;
+  }
+
+  .setup p.lede{
+    color:var(--text-dim);
+    margin:0 0 28px;
+    font-size:14.5px;
+    line-height:1.5;
+  }
+
+  .cycle-list{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .cycle-row{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:16px 18px 18px;
+  }
+
+  .cycle-row__head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:14px;
+  }
+
+  .cycle-row__title{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    font-weight:600;
+    letter-spacing:0.06em;
+    color:var(--text-dim);
+    text-transform:uppercase;
+  }
+
+  .icon-btn{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    width:26px;
+    height:26px;
+    border-radius:8px;
+    font-size:15px;
+    line-height:1;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:border-color var(--motion), color var(--motion), background var(--motion);
+  }
+  .icon-btn:hover{
+    border-color:var(--danger);
+    color:var(--danger);
+    background:rgba(217,108,108,0.08);
+  }
+
+  .cycle-row__fields{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+  }
+
+  @media (max-width:460px){
+    .cycle-row__fields{ grid-template-columns:1fr; }
+  }
+
+  .field{
+    background:var(--surface-2);
+    border-radius:var(--radius-md);
+    padding:12px 12px 13px;
+    border-left:3px solid transparent;
+  }
+  .field--work{ border-left-color:var(--work); }
+  .field--rest{ border-left-color:var(--rest); }
+
+  .field__label{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    font-size:12.5px;
+    font-weight:700;
+    color:var(--text-dim);
+    margin-bottom:9px;
+  }
+
+  .dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    display:inline-block;
+    flex:none;
+  }
+  .dot--work{ background:var(--work); }
+  .dot--rest{ background:var(--rest); }
+
+  .field__inputs{
+    display:flex;
+    align-items:center;
+    gap:5px;
+  }
+
+  .num{
+    width:52px;
+    background:var(--surface-3);
+    border:1px solid var(--border);
+    color:var(--text);
+    border-radius:7px;
+    padding:7px 6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+    font-weight:600;
+    text-align:center;
+  }
+  .num:focus-visible{ outline-offset:1px; }
+
+  .unit{
+    font-size:11.5px;
+    color:var(--text-faint);
+    margin-right:6px;
+  }
+  .unit:last-child{ margin-right:0; }
+
+  .add-cycle{
+    margin-top:14px;
+    width:100%;
+    background:transparent;
+    border:1.5px dashed var(--border);
+    color:var(--text-dim);
+    border-radius:var(--radius-md);
+    padding:13px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    transition:border-color var(--motion), color var(--motion), background var(--motion);
+  }
+  .add-cycle:hover{
+    border-color:var(--work);
+    color:var(--work-strong);
+    background:var(--work-dim);
+  }
+  .add-cycle::before{ content:"+ "; }
+
+  .summary-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin:22px 0 12px;
+    font-size:13px;
+    color:var(--text-dim);
+  }
+  .summary-row span{ font-family:'IBM Plex Mono', monospace; color:var(--text); font-weight:600; }
+
+  .hint{
+    font-size:12.5px;
+    color:var(--danger);
+    margin:0 0 12px;
+  }
+
+  .btn{
+    border:none;
+    border-radius:var(--radius-md);
+    padding:15px 20px;
+    font-size:15px;
+    font-weight:800;
+    cursor:pointer;
+    width:100%;
+    transition:transform var(--motion), opacity var(--motion), background var(--motion);
+  }
+  .btn:active{ transform:scale(0.98); }
+
+  .btn--primary{
+    background:linear-gradient(135deg, var(--work-strong), var(--work));
+    color:#241704;
+  }
+  .btn--primary:disabled{
+    opacity:0.35;
+    cursor:not-allowed;
+  }
+
+  .btn--ghost{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+  }
+  .btn--ghost:hover{ border-color:var(--text-dim); color:var(--text); }
+
+  .btn--link{
+    background:transparent;
+    border:none;
+    color:var(--text-faint);
+    font-weight:700;
+    font-size:13px;
+    text-decoration:underline;
+    text-decoration-color:var(--border);
+    padding:6px;
+    cursor:pointer;
+    width:auto;
+  }
+  .btn--link:hover{ color:var(--text-dim); }
+
+  .mute-btn{
+    position:fixed;
+    top:20px;
+    right:20px;
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:border-color var(--motion), color var(--motion), background var(--motion);
+    z-index:10;
+  }
+  .mute-btn:hover{ border-color:var(--work); color:var(--work-strong); }
+  .mute-btn.is-muted{ border-color:var(--danger); color:var(--danger); background:rgba(217,108,108,0.08); }
+
+  /* ---------- Run screen ---------- */
+
+  .run{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    padding-top:12px;
+  }
+
+  .run__meta{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:22px;
+  }
+
+  .run__cycle{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    letter-spacing:0.06em;
+    color:var(--text-faint);
+    text-transform:uppercase;
+  }
+
+  .phase-pill{
+    font-size:11.5px;
+    font-weight:800;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    padding:5px 12px;
+    border-radius:20px;
+  }
+  .phase-pill--work{ background:var(--work-dim); color:var(--work-strong); }
+  .phase-pill--rest{ background:var(--rest-dim); color:var(--rest-strong); }
+
+  .countdown{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:clamp(64px,17vw,104px);
+    font-weight:600;
+    letter-spacing:0.01em;
+    font-variant-numeric:tabular-nums;
+    line-height:1;
+    margin:6px 0 30px;
+  }
+
+  .tape{
+    position:relative;
+    width:100%;
+    height:22px;
+    border-radius:7px;
+    background:var(--surface-2);
+    overflow:hidden;
+  }
+
+  .tape__segment{
+    position:absolute;
+    top:0; bottom:0;
+    box-sizing:border-box;
+    border-right:2px solid var(--ink);
+    transition:background-color var(--motion);
+  }
+  .tape__segment--work{ background:var(--work-dim); }
+  .tape__segment--rest{ background:var(--rest-dim); }
+  .tape__segment.is-done{ background:var(--done-fill); }
+
+  .tape__micro-track{
+    position:absolute;
+    inset:3px;
+    display:flex;
+    gap:2px;
+  }
+
+  .tape__micro{
+    flex:1;
+    min-width:2px;
+    border-radius:2px;
+    background:transparent;
+    transition:background-color 150ms linear;
+  }
+  .tape__micro-track--work .tape__micro{ background:var(--work-dim); }
+  .tape__micro-track--rest .tape__micro{ background:var(--rest-dim); }
+
+  .controls{
+    display:flex;
+    gap:10px;
+    width:100%;
+    margin-top:30px;
+  }
+  .controls .btn{ flex:1; }
+
+  /* ---------- Done screen ---------- */
+
+  .done{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    text-align:center;
+    padding:30px 0 6px;
+  }
+
+  .checkmark{
+    width:64px; height:64px;
+    border-radius:50%;
+    background:var(--rest-dim);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-bottom:20px;
+  }
+
+  .done h2{
+    font-size:22px;
+    font-weight:800;
+    margin:0 0 8px;
+  }
+
+  .done p{
+    color:var(--text-dim);
+    font-size:14.5px;
+    margin:0 0 26px;
+    max-width:360px;
+    line-height:1.5;
+  }
+
+  .done .controls{ margin-top:0; }
+</style>
+</head>
+<body>
+<button type="button" id="mute-btn" class="mute-btn" aria-pressed="false" aria-label="Выключить звук" title="Выключить звук">
+  <svg class="mute-btn__icon mute-btn__icon--on" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/>
+    <path d="M16.3 8.6a5 5 0 0 1 0 6.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M19 6a9 9 0 0 1 0 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity="0.55"/>
+  </svg>
+  <svg class="mute-btn__icon mute-btn__icon--off" width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true" hidden>
+    <path d="M4 9v6h4l5 5V4L8 9H4z" fill="currentColor"/>
+    <path d="M16 9l5 5M21 9l-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+  </svg>
+</button>
+
+<div class="shell">
+
+  <!-- ============ SETUP SCREEN ============ -->
+  <section id="screen-setup" class="setup">
+    <p class="eyebrow">Настройка сессии</p>
+    <h1>Таймер работы и отдыха</h1>
+    <p class="lede">Задайте время работы и отдыха для каждого цикла — можно добавить несколько блоков с разными интервалами. Сигнал прозвучит по окончании работы и по окончании отдыха.</p>
+
+    <div class="cycle-list" id="cycle-list"></div>
+
+    <button type="button" class="add-cycle" id="add-cycle">Добавить цикл</button>
+
+    <div class="summary-row">
+      <span id="total-time-label">Итого по плану</span>
+      <span id="total-time">0 сек</span>
+    </div>
+    <p class="hint" id="validation-hint" hidden>Укажите время работы хотя бы для одного цикла.</p>
+
+    <button type="button" class="btn btn--primary" id="start-btn">Начать сессию</button>
+  </section>
+
+  <!-- ============ RUN SCREEN ============ -->
+  <section id="screen-run" class="run" hidden>
+    <div class="run__meta">
+      <span class="run__cycle" id="run-cycle-indicator">Цикл 1 из 1</span>
+      <span class="phase-pill phase-pill--work" id="phase-pill">Работа</span>
+    </div>
+
+    <div class="countdown" id="countdown" aria-live="polite">00:00</div>
+
+    <div class="tape" id="tape"></div>
+
+    <div class="controls">
+      <button type="button" class="btn btn--ghost" id="reset-btn">Сброс</button>
+      <button type="button" class="btn btn--primary" id="pause-btn">Пауза</button>
+    </div>
+  </section>
+
+  <!-- ============ DONE SCREEN ============ -->
+  <section id="screen-done" class="done" hidden>
+    <div class="checkmark">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+        <path d="M4 12.5L9.5 18L20 6" stroke="#63c4bf" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <h2>Сессия завершена</h2>
+    <p>Все циклы работы и отдыха выполнены по плану.</p>
+    <div class="controls">
+      <button type="button" class="btn btn--ghost" id="edit-btn">Изменить настройки</button>
+      <button type="button" class="btn btn--primary" id="restart-btn">Запустить снова</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  'use strict';
+
+  var screens = {
+    setup: document.getElementById('screen-setup'),
+    run: document.getElementById('screen-run'),
+    done: document.getElementById('screen-done')
+  };
+
+  var cycleList = document.getElementById('cycle-list');
+  var addCycleBtn = document.getElementById('add-cycle');
+  var startBtn = document.getElementById('start-btn');
+  var totalTimeEl = document.getElementById('total-time');
+  var validationHint = document.getElementById('validation-hint');
+
+  var runCycleIndicator = document.getElementById('run-cycle-indicator');
+  var phasePill = document.getElementById('phase-pill');
+  var countdownEl = document.getElementById('countdown');
+  var tapeEl = document.getElementById('tape');
+  var pauseBtn = document.getElementById('pause-btn');
+  var resetBtn = document.getElementById('reset-btn');
+  var restartBtn = document.getElementById('restart-btn');
+  var editBtn = document.getElementById('edit-btn');
+  var muteBtn = document.getElementById('mute-btn');
+  var muteIconOn = muteBtn.querySelector('.mute-btn__icon--on');
+  var muteIconOff = muteBtn.querySelector('.mute-btn__icon--off');
+
+  var originalTitle = document.title;
+  var isMuted = false;
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var ZONE_COLORS = { good: '#5fbe72', warn: '#f0c43d', bad: '#e5645c' };
+
+  var sequence = [];
+  var segLayout = [];
+  var currentIndex = 0;
+  var totalCycles = 0;
+  var phaseEndTime = 0;
+  var remainingMsAtPause = 0;
+  var isPaused = false;
+  var rafId = null;
+  var audioCtx = null;
+  var lastDisplayedSec = null;
+
+  function showScreen(name){
+    Object.keys(screens).forEach(function(k){
+      screens[k].hidden = (k !== name);
+    });
+  }
+
+  function clamp(v, min, max){
+    if (isNaN(v)) v = 0;
+    return Math.min(max, Math.max(min, v));
+  }
+
+  /* ---------------- Cycle rows (setup) ---------------- */
+
+  function makeRowHTML(work, rest){
+    return '' +
+      '<div class="cycle-row" data-row>' +
+        '<div class="cycle-row__head">' +
+          '<span class="cycle-row__title" data-title>Цикл 1</span>' +
+          '<button type="button" class="icon-btn" data-action="remove" aria-label="Удалить цикл">×</button>' +
+        '</div>' +
+        '<div class="cycle-row__fields">' +
+          '<div class="field field--work">' +
+            '<span class="field__label"><i class="dot dot--work"></i>Работа</span>' +
+            '<div class="field__inputs">' +
+              '<input type="number" class="num" data-role="work-min" min="0" max="180" step="1" value="' + work.m + '" aria-label="Минуты работы">' +
+              '<span class="unit">мин</span>' +
+              '<input type="number" class="num" data-role="work-sec" min="0" max="59" step="5" value="' + work.s + '" aria-label="Секунды работы">' +
+              '<span class="unit">сек</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="field field--rest">' +
+            '<span class="field__label"><i class="dot dot--rest"></i>Отдых</span>' +
+            '<div class="field__inputs">' +
+              '<input type="number" class="num" data-role="rest-min" min="0" max="180" step="1" value="' + rest.m + '" aria-label="Минуты отдыха">' +
+              '<span class="unit">мин</span>' +
+              '<input type="number" class="num" data-role="rest-sec" min="0" max="59" step="5" value="' + rest.s + '" aria-label="Секунды отдыха">' +
+              '<span class="unit">сек</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function addRow(work, rest){
+    cycleList.insertAdjacentHTML('beforeend', makeRowHTML(work, rest));
+    renumberRows();
+    updateSummary();
+  }
+
+  function renumberRows(){
+    var rows = cycleList.querySelectorAll('[data-row]');
+    rows.forEach(function(row, i){
+      row.querySelector('[data-title]').textContent = 'Цикл ' + (i + 1);
+      var removeBtn = row.querySelector('[data-action="remove"]');
+      removeBtn.hidden = rows.length <= 1;
+    });
+  }
+
+  function readRow(row){
+    function g(role){
+      var el = row.querySelector('[data-role="' + role + '"]');
+      var v = parseInt(el.value, 10);
+      return isNaN(v) ? 0 : v;
+    }
+    return {
+      workSec: clamp(g('work-min'), 0, 180) * 60 + clamp(g('work-sec'), 0, 59),
+      restSec: clamp(g('rest-min'), 0, 180) * 60 + clamp(g('rest-sec'), 0, 59)
+    };
+  }
+
+  function getCycles(){
+    return Array.prototype.map.call(cycleList.querySelectorAll('[data-row]'), readRow);
+  }
+
+  function formatDuration(totalSec){
+    var h = Math.floor(totalSec / 3600);
+    var m = Math.floor((totalSec % 3600) / 60);
+    var s = totalSec % 60;
+    var parts = [];
+    if (h) parts.push(h + ' ч');
+    if (h || m) parts.push(m + ' мин');
+    if (!h) parts.push(s + ' сек');
+    return parts.length ? parts.join(' ') : '0 сек';
+  }
+
+  function updateSummary(){
+    var cycles = getCycles();
+    var total = cycles.reduce(function(a, c){ return a + c.workSec + c.restSec; }, 0);
+    totalTimeEl.textContent = formatDuration(total);
+    var hasWork = cycles.some(function(c){ return c.workSec > 0; });
+    startBtn.disabled = !hasWork;
+    validationHint.hidden = hasWork;
+  }
+
+  cycleList.addEventListener('input', function(e){
+    if (e.target.matches('input[type="number"]')) updateSummary();
+  });
+
+  cycleList.addEventListener('change', function(e){
+    var input = e.target;
+    if (input.matches('input[type="number"]')) {
+      var min = parseInt(input.min, 10);
+      var max = parseInt(input.max, 10);
+      var v = parseInt(input.value, 10);
+      input.value = clamp(v, min, max);
+      updateSummary();
+    }
+  });
+
+  cycleList.addEventListener('click', function(e){
+    var btn = e.target.closest('[data-action="remove"]');
+    if (!btn) return;
+    var rows = cycleList.querySelectorAll('[data-row]');
+    if (rows.length <= 1) return;
+    btn.closest('[data-row]').remove();
+    renumberRows();
+    updateSummary();
+  });
+
+  addCycleBtn.addEventListener('click', function(){
+    var rows = cycleList.querySelectorAll('[data-row]');
+    var defWork = { m: 25, s: 0 };
+    var defRest = { m: 5, s: 0 };
+    if (rows.length) {
+      var last = readRow(rows[rows.length - 1]);
+      defWork = { m: Math.floor(last.workSec / 60), s: last.workSec % 60 };
+      defRest = { m: Math.floor(last.restSec / 60), s: last.restSec % 60 };
+    }
+    addRow(defWork, defRest);
+  });
+
+  addRow({ m: 25, s: 0 }, { m: 5, s: 0 });
+
+  /* ---------------- Sequence & layout ---------------- */
+
+  function buildSequence(){
+    var cycles = getCycles();
+    totalCycles = cycles.length;
+    var seq = [];
+    cycles.forEach(function(c, idx){
+      if (c.workSec > 0) seq.push({ type: 'work', duration: c.workSec, cycle: idx });
+      if (c.restSec > 0) seq.push({ type: 'rest', duration: c.restSec, cycle: idx });
+    });
+    return seq;
+  }
+
+  function computeLayout(seq){
+    var total = seq.reduce(function(a, p){ return a + p.duration; }, 0);
+    var minPct = 3;
+    var raw = seq.map(function(p){ return total ? (p.duration / total) * 100 : 0; });
+    raw = raw.map(function(p){ return Math.max(p, minPct); });
+    var sum = raw.reduce(function(a, b){ return a + b; }, 0) || 1;
+    var scale = 100 / sum;
+    var left = 0;
+    return seq.map(function(p, i){
+      var pct = raw[i] * scale;
+      var item = { type: p.type, duration: p.duration, cycle: p.cycle, pct: pct, left: left };
+      left += pct;
+      return item;
+    });
+  }
+
+  function microCountFor(pct){
+    return Math.max(6, Math.min(24, Math.round(pct / 2)));
+  }
+
+  function renderTape(activeIdx){
+    var html = segLayout.map(function(seg, i){
+      if (activeIdx !== null && i === activeIdx){
+        var n = microCountFor(seg.pct);
+        var micros = '';
+        for (var j = 0; j < n; j++){ micros += '<div class="tape__micro" data-micro="' + j + '"></div>'; }
+        var inner = '<div class="tape__micro-track tape__micro-track--' + seg.type + '">' + micros + '</div>';
+        return '<div class="tape__segment tape__segment--' + seg.type + '" style="left:' + seg.left + '%;width:' + seg.pct + '%" data-seg="' + i + '" data-count="' + n + '">' + inner + '</div>';
+      }
+      var doneClass = (activeIdx !== null && i < activeIdx) ? ' is-done' : '';
+      return '<div class="tape__segment tape__segment--' + seg.type + doneClass + '" style="left:' + seg.left + '%;width:' + seg.pct + '%" data-seg="' + i + '"></div>';
+    }).join('');
+    tapeEl.innerHTML = html;
+  }
+
+  /* ---------------- Timer engine ---------------- */
+
+  function formatClock(ms){
+    var total = Math.max(0, Math.round(ms / 1000));
+    var m = Math.floor(total / 60);
+    var s = total % 60;
+    return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function setPhaseUI(phase){
+    phasePill.textContent = phase.type === 'work' ? 'Работа' : 'Отдых';
+    phasePill.className = 'phase-pill phase-pill--' + phase.type;
+    runCycleIndicator.textContent = 'Цикл ' + (phase.cycle + 1) + ' из ' + totalCycles;
+  }
+
+  function zoneForRatio(ratio){
+    if (ratio < 0.5) return 'good';
+    if (ratio < 0.85) return 'warn';
+    return 'bad';
+  }
+
+  function updateProgressUI(progress){
+    var container = tapeEl.querySelector('[data-seg="' + currentIndex + '"]');
+    if (!container) return;
+    var n = parseInt(container.getAttribute('data-count'), 10) || 0;
+    var litCount = Math.min(n, Math.round(progress * n));
+    var micros = container.querySelectorAll('.tape__micro');
+    micros.forEach(function(m, j){
+      if (j >= litCount){
+        m.style.background = '';
+        return;
+      }
+      var ratio = n > 1 ? (j + 0.5) / n : 0;
+      m.style.background = ZONE_COLORS[zoneForRatio(ratio)];
+    });
+  }
+
+  function startSession(){
+    sequence = buildSequence();
+    if (!sequence.length) return;
+    segLayout = computeLayout(sequence);
+    currentIndex = -1;
+    isPaused = false;
+    pauseBtn.textContent = 'Пауза';
+    showScreen('run');
+    advancePhase();
+  }
+
+  function advancePhase(){
+    currentIndex++;
+    if (currentIndex >= sequence.length){
+      finishSession();
+      return;
+    }
+    var phase = sequence[currentIndex];
+    setPhaseUI(phase);
+    renderTape(currentIndex);
+    phaseEndTime = Date.now() + phase.duration * 1000;
+    lastDisplayedSec = null;
+    loop();
+  }
+
+  function loop(){
+    var phase = sequence[currentIndex];
+    var remaining = phaseEndTime - Date.now();
+    if (remaining <= 0){
+      onPhaseEnd(phase);
+      return;
+    }
+    var secLeft = Math.ceil(remaining / 1000);
+    if (secLeft !== lastDisplayedSec){
+      lastDisplayedSec = secLeft;
+      countdownEl.textContent = formatClock(remaining);
+      document.title = formatClock(remaining) + ' · ' + (phase.type === 'work' ? 'Работа' : 'Отдых');
+    }
+    var progress = 1 - (remaining / 1000) / phase.duration;
+    updateProgressUI(progress);
+    rafId = requestAnimationFrame(loop);
+  }
+
+  function onPhaseEnd(phase){
+    updateProgressUI(1);
+    if (phase.type === 'work') playWorkEnd(); else playRestEnd();
+    advancePhase();
+  }
+
+  function finishSession(){
+    document.title = originalTitle;
+    playComplete();
+    showScreen('done');
+  }
+
+  function stopToSetup(){
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = null;
+    document.title = originalTitle;
+    showScreen('setup');
+  }
+
+  pauseBtn.addEventListener('click', function(){
+    if (!isPaused){
+      isPaused = true;
+      remainingMsAtPause = phaseEndTime - Date.now();
+      if (rafId) cancelAnimationFrame(rafId);
+      pauseBtn.textContent = 'Продолжить';
+    } else {
+      isPaused = false;
+      phaseEndTime = Date.now() + remainingMsAtPause;
+      lastDisplayedSec = null;
+      pauseBtn.textContent = 'Пауза';
+      loop();
+    }
+  });
+
+  resetBtn.addEventListener('click', stopToSetup);
+  editBtn.addEventListener('click', stopToSetup);
+  restartBtn.addEventListener('click', function(){ startSession(); });
+
+  startBtn.addEventListener('click', function(){
+    ensureAudio();
+    startSession();
+  });
+
+  muteBtn.addEventListener('click', function(){
+    isMuted = !isMuted;
+    muteBtn.classList.toggle('is-muted', isMuted);
+    muteBtn.setAttribute('aria-pressed', String(isMuted));
+    var label = isMuted ? 'Включить звук' : 'Выключить звук';
+    muteBtn.title = label;
+    muteBtn.setAttribute('aria-label', label);
+    muteIconOn.hidden = isMuted;
+    muteIconOff.hidden = !isMuted;
+  });
+
+  /* ---------------- Audio (Web Audio API, no external files) ---------------- */
+
+  function ensureAudio(){
+    if (!audioCtx){
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new Ctx();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  }
+
+  function beep(freq, start, dur, peak, type){
+    if (!audioCtx || isMuted) return;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.value = freq;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    var now = audioCtx.currentTime + start;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(peak, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    osc.start(now);
+    osc.stop(now + dur + 0.03);
+  }
+
+  function playWorkEnd(){
+    beep(880, 0.00, 0.16, 0.22, 'sine');
+    beep(660, 0.20, 0.16, 0.20, 'sine');
+    beep(880, 0.40, 0.22, 0.24, 'sine');
+  }
+
+  function playRestEnd(){
+    beep(560, 0, 0.14, 0.18, 'sine');
+  }
+
+  function playComplete(){
+    beep(523, 0.00, 0.14, 0.20, 'sine');
+    beep(659, 0.14, 0.14, 0.20, 'sine');
+    beep(784, 0.28, 0.24, 0.22, 'sine');
+  }
+
+  updateSummary();
+})();
+</script>
+</body>
+</html>
