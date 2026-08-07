@@ -542,6 +542,8 @@
   var rafId = null;
   var audioCtx = null;
   var lastDisplayedSec = null;
+  var phaseEndTimeoutId = null;
+  var SIGNAL_DURATION = 3;
 
   function showScreen(name){
     Object.keys(screens).forEach(function(k){
@@ -807,7 +809,10 @@
   function onPhaseEnd(phase){
     updateProgressUI(1);
     if (phase.type === 'work') playWorkEnd(); else playRestEnd();
-    advancePhase();
+    phaseEndTimeoutId = setTimeout(function(){
+      phaseEndTimeoutId = null;
+      advancePhase();
+    }, SIGNAL_DURATION * 1000);
   }
 
   function finishSession(){
@@ -819,6 +824,8 @@
   function stopToSetup(){
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
+    if (phaseEndTimeoutId) clearTimeout(phaseEndTimeoutId);
+    phaseEndTimeoutId = null;
     document.title = originalTitle;
     showScreen('setup');
   }
@@ -885,13 +892,22 @@
   }
 
   function playWorkEnd(){
-    beep(880, 0.00, 0.16, 0.22, 'sine');
-    beep(660, 0.20, 0.16, 0.20, 'sine');
-    beep(880, 0.40, 0.22, 0.24, 'sine');
+    var period = 0.6;
+    var repeats = Math.ceil(SIGNAL_DURATION / period);
+    for (var i = 0; i < repeats; i++){
+      var offset = i * period;
+      beep(880, offset + 0.00, 0.16, 0.22, 'sine');
+      beep(660, offset + 0.20, 0.16, 0.20, 'sine');
+      beep(880, offset + 0.40, 0.22, 0.24, 'sine');
+    }
   }
 
   function playRestEnd(){
-    beep(560, 0, 0.14, 0.18, 'sine');
+    var period = 0.3;
+    var repeats = Math.ceil(SIGNAL_DURATION / period);
+    for (var i = 0; i < repeats; i++){
+      beep(560, i * period, 0.14, 0.18, 'sine');
+    }
   }
 
   function playComplete(){
