@@ -539,11 +539,21 @@
   var phaseEndTime = 0;
   var remainingMsAtPause = 0;
   var isPaused = false;
-  var rafId = null;
   var audioCtx = null;
   var lastDisplayedSec = null;
-  var phaseEndTimeoutId = null;
   var SIGNAL_DURATION = 3;
+  var runState = 'idle';
+  var signalEndTime = 0;
+
+  /* Dedicated worker as an unthrottled heartbeat: background/hidden tabs get
+     requestAnimationFrame stopped entirely and setInterval throttled down to
+     ~1/min after a few minutes, but a worker's own timers aren't subject to
+     that page-visibility throttling. */
+  var heartbeat = new Worker(URL.createObjectURL(new Blob(
+    ['setInterval(function(){ postMessage(1); }, 250);'],
+    { type: 'application/javascript' }
+  )));
+  heartbeat.onmessage = function(){ tick(); };
 
   function showScreen(name){
     Object.keys(screens).forEach(function(k){
@@ -785,10 +795,20 @@
     renderTape(currentIndex);
     phaseEndTime = Date.now() + phase.duration * 1000;
     lastDisplayedSec = null;
-    loop();
+    runState = 'counting';
   }
 
-  function loop(){
+  function tick(){
+    if (isPaused || runState === 'idle') return;
+
+    if (runState === 'signal-wait'){
+      if (Date.now() >= signalEndTime){
+        runState = 'idle';
+        advancePhase();
+      }
+      return;
+    }
+
     var phase = sequence[currentIndex];
     var remaining = phaseEndTime - Date.now();
     if (remaining <= 0){
@@ -803,29 +823,25 @@
     }
     var progress = 1 - (remaining / 1000) / phase.duration;
     updateProgressUI(progress);
-    rafId = requestAnimationFrame(loop);
   }
 
   function onPhaseEnd(phase){
     updateProgressUI(1);
+    ensureAudio();
     if (phase.type === 'work') playWorkEnd(); else playRestEnd();
-    phaseEndTimeoutId = setTimeout(function(){
-      phaseEndTimeoutId = null;
-      advancePhase();
-    }, SIGNAL_DURATION * 1000);
+    runState = 'signal-wait';
+    signalEndTime = Date.now() + SIGNAL_DURATION * 1000;
   }
 
   function finishSession(){
+    runState = 'idle';
     document.title = originalTitle;
     playComplete();
     showScreen('done');
   }
 
   function stopToSetup(){
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = null;
-    if (phaseEndTimeoutId) clearTimeout(phaseEndTimeoutId);
-    phaseEndTimeoutId = null;
+    runState = 'idle';
     document.title = originalTitle;
     showScreen('setup');
   }
@@ -834,14 +850,12 @@
     if (!isPaused){
       isPaused = true;
       remainingMsAtPause = phaseEndTime - Date.now();
-      if (rafId) cancelAnimationFrame(rafId);
       pauseBtn.textContent = 'Продолжить';
     } else {
       isPaused = false;
       phaseEndTime = Date.now() + remainingMsAtPause;
       lastDisplayedSec = null;
       pauseBtn.textContent = 'Пауза';
-      loop();
     }
   });
 
