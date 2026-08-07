@@ -355,9 +355,29 @@
     width:100%;
   }
 
+  .tape-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    width:100%;
+  }
+
+  .tape-time{
+    flex:none;
+    width:78px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    line-height:22px;
+    color:var(--text);
+    white-space:nowrap;
+  }
+  .tape-time--work{ text-align:right; }
+  .tape-time--rest{ text-align:left; }
+
   .tape{
     position:relative;
     width:100%;
+    flex:1;
     height:22px;
     border-radius:7px;
     background:var(--surface-2);
@@ -647,6 +667,14 @@
     return parts.length ? parts.join(' ') : '0 сек';
   }
 
+  function formatCycleDuration(totalSec){
+    var totalMin = Math.round(totalSec / 60);
+    var h = Math.floor(totalMin / 60);
+    var m = totalMin % 60;
+    if (!h) return m + ' мин';
+    return m ? (h + ' час ' + m + ' мин') : (h + ' час');
+  }
+
   function updateSummary(){
     var cycles = getCycles();
     var total = cycles.reduce(function(a, c){ return a + c.workSec + c.restSec; }, 0);
@@ -728,7 +756,7 @@
     return Math.max(6, Math.min(24, Math.round(pct / 2)));
   }
 
-  function groupByCycle(seq){
+  function groupByCycle(seq, cyclesInfo){
     var order = [];
     var byCycle = {};
     seq.forEach(function(phase, globalIndex){
@@ -740,6 +768,8 @@
       var localLayout = computeLayout(entries.map(function(e){ return e.phase; }));
       return {
         cycle: cycleNum,
+        workSec: cyclesInfo[cycleNum].workSec,
+        restSec: cyclesInfo[cycleNum].restSec,
         segments: localLayout.map(function(seg, idx){
           seg.globalIndex = entries[idx].globalIndex;
           return seg;
@@ -764,7 +794,10 @@
   function renderTape(activeIdx){
     var html = cycleLayouts.map(function(group){
       var segsHtml = group.segments.map(function(seg){ return renderSegment(seg, activeIdx); }).join('');
-      return '<div class="tape" data-cycle="' + group.cycle + '">' + segsHtml + '</div>';
+      var workLabel = '<span class="tape-time tape-time--work">' + formatCycleDuration(group.workSec) + '</span>';
+      var restLabel = '<span class="tape-time tape-time--rest">' + formatCycleDuration(group.restSec) + '</span>';
+      var bar = '<div class="tape" data-cycle="' + group.cycle + '">' + segsHtml + '</div>';
+      return '<div class="tape-row">' + workLabel + bar + restLabel + '</div>';
     }).join('');
     tapeEl.innerHTML = html;
   }
@@ -809,7 +842,7 @@
   function startSession(){
     sequence = buildSequence();
     if (!sequence.length) return;
-    cycleLayouts = groupByCycle(sequence);
+    cycleLayouts = groupByCycle(sequence, getCycles());
     currentIndex = -1;
     isPaused = false;
     pauseBtn.textContent = 'Пауза';
